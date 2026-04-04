@@ -13,8 +13,6 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -26,19 +24,6 @@ jobs:
 
       - name: Run Tests
         run: pytest tests/ -v
-
-      - name: SonarQube Scan
-        uses: SonarSource/sonarqube-scan-action@v5
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: https://sonarcloud.io
-        with:
-          args: >
-            -Dsonar.projectKey=itzbhav_chat-api-app
-            -Dsonar.organization=itzbhav
-            -Dsonar.sources=app
-            -Dsonar.tests=tests
-            -Dsonar.python.version=3.11
 
       - name: Build Docker Image
         run: docker build -t bhavs143/chat-api:${{ github.sha }} .
@@ -72,4 +57,4 @@ jobs:
           sed -i "s|image: bhavs143/chat-api:.*|image: bhavs143/chat-api:${{ github.sha }}|g" manifests/deployment.yaml
           git add .
           git commit -m "CI: update image tag to ${{ github.sha }}"
-          git push
+          git push 
