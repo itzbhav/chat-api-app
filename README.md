@@ -35,7 +35,7 @@ pytest tests/ -v
 ## GitHub Secrets Required
 | Secret | Description |
 |--------|-------------|
-| DOCKERHUB_USERNAME | Docker Hub username (bhavs143) |
+| DOCKERHUB_USERNAME | Docker Hub username |
 | DOCKERHUB_TOKEN | Docker Hub access token |
 | SONAR_TOKEN | SonarCloud token |
 | CONFIG_REPO_TOKEN | GitHub PAT to push to config repo |
