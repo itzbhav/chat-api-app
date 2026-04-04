@@ -1,0 +1,82 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-test-scan:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout code
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # 2. Set up Python
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # 3. Install dependencies
+      - name: Install Dependencies
+        run: |
+          pip install -r requirements.txt
+
+      # 4. Run Pytest
+      - name: Run Tests
+        run: pytest tests/ -v
+
+      # 5. SonarQube Scan
+      - name: SonarQube Scan
+        uses: SonarSource/sonarcloud-github-action@master
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.projectKey=chat-api-app
+            -Dsonar.organization=bhavs143
+            -Dsonar.sources=app
+            -Dsonar.tests=tests
+
+      # 6. Build Docker Image
+      - name: Build Docker Image
+        run: docker build -t bhavs143/chat-api:${{ github.sha }} .
+
+      # 7. Trivy Vulnerability Scan
+      - name: Trivy Security Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: bhavs143/chat-api:${{ github.sha }}
+          format: table
+          exit-code: "1"
+          severity: CRITICAL,HIGH
+
+      # 8. Login to Docker Hub
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # 9. Push Image to Docker Hub
+      - name: Push Docker Image
+        run: |
+          docker push bhavs143/chat-api:${{ github.sha }}
+          docker tag bhavs143/chat-api:${{ github.sha }} bhavs143/chat-api:latest
+          docker push bhavs143/chat-api:latest
+
+      # 10. Update image tag in Config Repo
+      - name: Update Config Repo Image Tag
+        run: |
+          git config --global user.email "ci-bot@github.com"
+          git config --global user.name "CI Bot"
+          git clone https://x-access-token:${{ secrets.CONFIG_REPO_TOKEN }}@github.com/bhavs143/chat-api-config.git
+          cd chat-api-config
+          sed -i "s|image: bhavs143/chat-api:.*|image: bhavs143/chat-api:${{ github.sha }}|g" manifests/deployment.yaml
+          git add .
+          git commit -m "CI: update image tag to ${{ github.sha }}"
+          git push
