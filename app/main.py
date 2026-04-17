@@ -1,11 +1,18 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 import redis.asyncio as aioredis
 import asyncio
 import json
 import os
+from prometheus_client import Counter, generate_latest, CONTENT_TYPE_LATEST
 
 app = FastAPI(title="Real-Time Chat API")
+
+message_counter = Counter(
+    'chat_messages_total',
+    'Total number of chat messages sent',
+    ['room']
+)
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 
@@ -13,6 +20,11 @@ REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+# ---------- Prometheus Metrics ----------
+@app.get("/metrics")
+def metrics():
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 # ---------- Send Message (REST) ----------
 @app.post("/send")
@@ -23,6 +35,7 @@ async def send_message(room: str, username: str, message: str):
     await r.lpush(f"history:{room}", payload)
     await r.ltrim(f"history:{room}", 0, 49)   # keep last 50 messages
     await r.aclose()
+    message_counter.labels(room=room).inc()
     return {"status": "sent", "room": room, "username": username, "message": message}
 
 # ---------- Message History (REST) ----------
